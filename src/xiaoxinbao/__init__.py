@@ -1,0 +1,1 @@
+"""Xiaoxinbao application package."""

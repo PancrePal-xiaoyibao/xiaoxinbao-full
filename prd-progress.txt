@@ -7,6 +7,8 @@ Started: 2026-04-06
 - Group conversations default to `actual_user_id@@group_id` so one user does not pollute another user's context in the same room.
 - Local verification must run against the mock LLM gateway; tests must not depend on real model credentials or a live WeChat service.
 - P0 does not persist user conversation content to disk; only non-sensitive metadata may appear in logs or docs.
+- Compose application services through `src/xiaoxinbao/bootstrap.py` so tests and FastAPI routes share the same dependency graph.
+- The P0 Gewechat adapter only accepts text messages (`MsgType == 1`); unsupported, expired, self, and non-user messages must short-circuit before Agent Core.
 
 ## 2026-04-06 08:45 - US-000
 Thread: local://manual-initialization
@@ -16,4 +18,41 @@ Thread: local://manual-initialization
 - Learnings for future iterations:
   - The existing Ralph prompt referenced `progress.txt`; the active progress file in this repo is `prd-progress.txt`.
   - The current environment lacks `amp` and `jq`, so Ralph iterations must be executed through an equivalent local loop until tooling is restored.
+---
+## 2026-04-06 09:40 - US-001
+Thread: local://ralph-equivalent-loop
+- Built the Python/FastAPI project skeleton with `uv`, `ruff`, `mypy`, `pytest`, `.gitignore`, and package entrypoints.
+- Added application bootstrap wiring and `/health` endpoint.
+- Learnings for future iterations:
+  - Use `Annotated[..., Depends(...)]` and `Annotated[..., Body(...)]` in FastAPI routes to satisfy Ruff's dependency-in-default lint rules.
+  - Keep `uv.lock` under version control to make the Ralph loop reproducible across machines.
+---
+## 2026-04-06 09:45 - US-002
+Thread: local://ralph-equivalent-loop
+- Implemented `SessionStore` with TTL + bounded history, markdown-based knowledge retrieval, and mock/direct/FastGPT gateway selection.
+- Added sample mental health knowledge content and a knowledge preview build script.
+- Learnings for future iterations:
+  - Chinese retrieval works more reliably when long contiguous Han text is additionally split into 2-character chunks.
+  - Persist only lightweight knowledge artifacts; user conversation data must remain memory-only in P0.
+---
+## 2026-04-06 09:50 - US-003
+Thread: local://ralph-equivalent-loop
+- Added `AgentService` prompt assembly, session replay, retrieval injection, and `POST /api/v1/chat/reply`.
+- Covered the debug chat flow with a passing API test.
+- Learnings for future iterations:
+  - Store raw user turns in session history and inject retrieval context only into the live LLM call, so cached history stays clean.
+---
+## 2026-04-06 09:55 - US-004
+Thread: local://ralph-equivalent-loop
+- Implemented Gewechat callback normalization, group mention parsing, trigger rules, and per-conversation async locking.
+- Added callback tests for accepted group messages, ignored non-user messages, and skipped non-trigger group traffic.
+- Learnings for future iterations:
+  - The adapter layer should be the only place aware of `MsgSource`, `MsgType`, `Wxid`, and group content prefixes like `actual_user_id:\\n`.
+---
+## 2026-04-06 10:00 - US-005
+Thread: local://ralph-equivalent-loop
+- Added README, API docs, Docker assets, and final documentation closure.
+- Verification completed with `uv run ruff check .`, `uv run mypy`, `uv run pytest`, and `uv run python scripts/build_knowledge.py`.
+- Learnings for future iterations:
+  - Keep PRD status, `.debug/todos.md`, and `prd.json` synchronized in the same change set to preserve the PRD/debug dual loop.
 ---
