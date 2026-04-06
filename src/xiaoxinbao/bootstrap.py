@@ -8,6 +8,7 @@ from xiaoxinbao.modules.chat.service import AgentService
 from xiaoxinbao.modules.knowledge.retriever import KnowledgeRetriever
 from xiaoxinbao.modules.llm.factory import build_gateway
 from xiaoxinbao.modules.sessions.store import SessionStore
+from xiaoxinbao.modules.wechat.client import build_gewechat_client
 from xiaoxinbao.modules.wechat.normalizer import GewechatAdapter
 from xiaoxinbao.modules.wechat.service import WechatService
 from xiaoxinbao.settings import Settings, get_settings
@@ -28,7 +29,10 @@ def create_container(settings: Settings | None = None) -> ServiceContainer:
         ttl_seconds=resolved_settings.session_ttl_seconds,
         max_turns=resolved_settings.session_history_limit,
     )
-    retriever = KnowledgeRetriever(Path(resolved_settings.knowledge_dir))
+    retriever = KnowledgeRetriever(
+        knowledge_dir=Path(resolved_settings.knowledge_dir),
+        default_strategy=resolved_settings.retrieval_mode,
+    )
     gateway = build_gateway(resolved_settings)
     agent_service = AgentService(
         settings=resolved_settings,
@@ -40,6 +44,7 @@ def create_container(settings: Settings | None = None) -> ServiceContainer:
         settings=resolved_settings,
         adapter=GewechatAdapter(bot_names=resolved_settings.bot_names),
         agent_service=agent_service,
+        delivery_client=build_gewechat_client(resolved_settings),
     )
     return ServiceContainer(
         settings=resolved_settings,

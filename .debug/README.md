@@ -2,7 +2,7 @@
 
 ## Current Goal
 
-将 `prd/PRD.md` 的修正版落地为一个可运行、可测试的 P0 后端骨架，并保持以下三份状态同步：
+将 `prd/PRD.md` 的修正版继续推进到 P0 之后的可测能力，并保持以下三份状态同步：
 
 1. `prd/PRD.md`
 2. `prd.json`
@@ -24,9 +24,10 @@
    - 每轮都要执行质量检查
    - 每轮都要回写 `prd.json` 与 `prd-progress.txt`
 
-## P0 Architecture Guardrails
+## Architecture Guardrails
 
 1. Wechat 原始 payload 只能进入 adapter 层，不得直接进入 Agent Core。
 2. 群聊默认 session 规则为 `actual_user_id@@group_id`。
 3. 只处理文本消息；语音、图片、文件只保留扩展位。
 4. 核心模块必须有 API 文档或测试覆盖，不允许“只写代码不留契约”。
+5. 出站 Gewechat 能力必须是可关闭的 adapter，不得把外部发送失败扩散成核心聊天失败。

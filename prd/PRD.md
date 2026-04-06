@@ -2,7 +2,7 @@
 
 > 版本: v1.1  
 > 日期: 2026-04-06  
-> 状态: **已校正，P0 后端闭环已验证**
+> 状态: **已校正，P0 与后续可测任务已落地验证**
 
 ---
 
@@ -337,11 +337,18 @@ xiaoxinbao-full/
 
 本 PRD 已从“内置微信机器人一体化实现”修正为“外部 Gewechat 服务 + 内部标准化适配 + Agent Core 解耦”的可执行方案。
 
-截至 2026-04-06，本仓库已完成 P0 后端落地并通过以下验证：
+截至 2026-04-06，本仓库已完成 P0 后端落地，并继续完成以下后续可测任务：
+
+1. Gewechat 出站文本回复链路
+2. 关键词 / 向量式可切换检索
+3. 独立 Knowledge Search API
+4. OpenAI-compatible gateway 与出站链路集成测试
+
+完整验证结果如下：
 
 1. `ruff check .`
 2. `mypy`
 3. `pytest`
 4. `python scripts/build_knowledge.py`
 
-后续 Ralph 可基于当前实现继续扩展真实 Gewechat 生产接入、向量检索和语音能力。
+后续剩余扩展主要是更深的真实 Gewechat 生产联调、真正的向量数据库接入，以及语音能力。

@@ -35,7 +35,11 @@ class AgentService:
         metadata: ConversationMetadata | None = None,
     ) -> AgentResult:
         resolved_metadata = metadata or ConversationMetadata()
-        hits = self._retriever.search(message)
+        hits = self._retriever.search(
+            message,
+            limit=self._settings.retrieval_top_k,
+            strategy=self._settings.retrieval_mode,
+        )
         prompt_messages = self._build_messages(
             message=message,
             conversation_id=conversation_id,

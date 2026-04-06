@@ -9,6 +9,8 @@ Started: 2026-04-06
 - P0 does not persist user conversation content to disk; only non-sensitive metadata may appear in logs or docs.
 - Compose application services through `src/xiaoxinbao/bootstrap.py` so tests and FastAPI routes share the same dependency graph.
 - The P0 Gewechat adapter only accepts text messages (`MsgType == 1`); unsupported, expired, self, and non-user messages must short-circuit before Agent Core.
+- Treat outbound Gewechat delivery as an optional adapter behind configuration; callback processing should still succeed even when delivery is disabled or unavailable.
+- Keep retrieval strategies selectable through one retriever facade so API handlers and Agent Core do not depend on a concrete search implementation.
 
 ## 2026-04-06 08:45 - US-000
 Thread: local://manual-initialization
@@ -55,4 +57,27 @@ Thread: local://ralph-equivalent-loop
 - Verification completed with `uv run ruff check .`, `uv run mypy`, `uv run pytest`, and `uv run python scripts/build_knowledge.py`.
 - Learnings for future iterations:
   - Keep PRD status, `.debug/todos.md`, and `prd.json` synchronized in the same change set to preserve the PRD/debug dual loop.
+---
+## 2026-04-06 10:45 - US-006
+Thread: local://ralph-equivalent-loop
+- Added an outbound Gewechat text delivery client and wired callback processing to optionally send replies back through the Gewechat API.
+- Added delivery metadata to callback responses and a delivery-enabled callback test.
+- Learnings for future iterations:
+  - Delivery should be optional and non-blocking; message processing cannot fail hard just because the outbound provider is unavailable.
+  - Group delivery needs both a room receiver id and an explicit `ats` list to preserve who the reply is for.
+---
+## 2026-04-06 10:50 - US-007
+Thread: local://ralph-equivalent-loop
+- Upgraded `KnowledgeRetriever` to support `keyword` and `vector` strategies behind one interface.
+- Added `POST /api/v1/knowledge/search` and corresponding tests.
+- Learnings for future iterations:
+  - Retrieval APIs are useful for corpus validation and should remain decoupled from the chat route.
+  - A light cosine-style token vector is enough to keep the interface honest before adopting a full vector database.
+---
+## 2026-04-06 10:55 - US-008
+Thread: local://ralph-equivalent-loop
+- Added tests for the OpenAI-compatible gateway and the Gewechat outbound client request contract.
+- Updated README and API docs to document post-P0 capabilities.
+- Learnings for future iterations:
+  - HTTP adapter modules should expose transport injection points so network contracts can be verified without real external services.
 ---

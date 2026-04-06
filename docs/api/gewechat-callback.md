@@ -8,6 +8,7 @@
 2. 非用户/过期/自发消息过滤
 3. 群聊触发判断
 4. Agent Core 调用
+5. 在启用出站模式时通过 Gewechat API 回发文本消息
 
 ### Supported P0 Fields
 
@@ -28,3 +29,21 @@
   }
 }
 ```
+
+## Delivery Behavior
+
+当 `.env` 中启用以下配置时，callback 处理成功后会通过 Gewechat 文本消息接口回发：
+
+```env
+GEWECHAT_SEND_ENABLED=true
+GEWECHAT_API_BASE=http://127.0.0.1:2531/v2/api
+GEWECHAT_TOKEN=xxx
+GEWECHAT_APP_ID=xxx
+GEWECHAT_SEND_TEXT_PATH=/message/postText
+```
+
+群聊回复会：
+
+1. 以群 `room_id` 作为接收方
+2. 使用原发送人 `sender_id` 作为 `ats`
+3. 在文本前自动补 `@发送人昵称`

@@ -1,7 +1,7 @@
 {
   "project": "xiaoxinbao-full",
   "branchName": "ralph/xiaoxinbao-gewechat-p0",
-  "description": "Build a testable FastAPI-based AI chat and Gewechat callback adapter service for XiaoXinBao using an adapter-first architecture.",
+  "description": "Build and extend a testable FastAPI-based AI chat service for XiaoXinBao with adapter-first WeChat integration, outbound Gewechat delivery, and upgraded retrieval capabilities.",
   "userStories": [
     {
       "id": "US-000",
@@ -89,6 +89,51 @@
       "priority": 5,
       "passes": true,
       "notes": "Completed with README, docs/api, Docker assets, knowledge build script, and final verification."
+    },
+    {
+      "id": "US-006",
+      "title": "Implement outbound Gewechat reply delivery",
+      "description": "As a WeChat bridge, I want processed callback replies to optionally be delivered back to Gewechat so that the service supports a real outbound reply path instead of response-only debugging.",
+      "acceptanceCriteria": [
+        "Configurable Gewechat text delivery client exists",
+        "Group replies can mention the original sender while targeting the room id",
+        "Delivery behavior is covered by tests",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Completed with configurable outbound Gewechat text delivery, reply formatting, and callback delivery tests."
+    },
+    {
+      "id": "US-007",
+      "title": "Upgrade retrieval strategies and expose knowledge search API",
+      "description": "As an operator, I want configurable keyword and vector-style retrieval plus a searchable knowledge API so that the corpus can be validated independently from the chat endpoint.",
+      "acceptanceCriteria": [
+        "Retriever supports configurable keyword and vector search modes",
+        "Knowledge search API exposes retrieval results",
+        "Retriever and API are covered by tests",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Completed with keyword/vector retrieval modes and POST /api/v1/knowledge/search."
+    },
+    {
+      "id": "US-008",
+      "title": "Add outbound and gateway integration verification",
+      "description": "As a maintainer, I want outbound Gewechat and OpenAI-compatible gateway integration tests and docs so that post-P0 features remain reproducible and verifiable.",
+      "acceptanceCriteria": [
+        "OpenAI-compatible gateway request behavior is tested",
+        "Gewechat outbound client request behavior is tested",
+        "Docs and progress files reflect the post-P0 capabilities",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Completed with OpenAI-compatible gateway tests, Gewechat delivery client tests, and docs/progress synchronization."
     }
   ]
 }
