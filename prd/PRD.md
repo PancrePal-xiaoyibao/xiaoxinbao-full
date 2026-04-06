@@ -1,395 +1,338 @@
 # 小馨宝 2.0 — 社区 AI 心理助手引擎 · 产品需求文档 (PRD)
 
-> 版本: v1.0 · 日期: 2026-04-06 · 作者: 小虾 🦞  
-> 状态: **待确认**
+> 版本: v1.1  
+> 日期: 2026-04-06  
+> 状态: **已校正，可执行**
 
 ---
 
-## 1. 背景与动机
+## 1. 背景与目标
 
 ### 1.1 现状痛点
 
-| 维度 | 现状 (小馨宝 1.0) | 问题 |
-|------|-------------------|------|
-| 平台 | FastGPT + Web 前端 | Web 端可用，但响应慢 |
-| 群聊接入 | Gewechat 卫星机器人框架 | FastGPT 后台回复速度慢，群聊体验极差 |
-| 并发能力 | 受限于 FastGPT 单线程调度 | 多群同时使用时队列阻塞 |
-| 数据管理 | FastGPT 内置存储 | 无合规备案，不能长期留存用户数据 |
-| 用户识别 | 无 | 无法区分群聊中的不同用户 |
+| 维度 | 现状 | 主要问题 |
+|------|------|----------|
+| LLM 接入 | FastGPT + Web 前端 | 响应慢，群聊体验差 |
+| 微信接入 | 依赖 Gewechat 卫星机器人链路 | 接入能力存在外部依赖与稳定性风险 |
+| 并发处理 | FastGPT 调度为主 | 多群并发时容易阻塞 |
+| 数据管理 | 平台内置存储 | 备案前不适合长期留存敏感对话数据 |
+| 用户识别 | 群聊内无法稳定区分用户 | 无法形成独立上下文与精准回复 |
 
 ### 1.2 核心目标
 
-**重新设计一个轻量、高并发、可一键部署的 AI Chat + RAG Agent 引擎**，替代 FastGPT 后端，与 Gewechat/微信机器人无缝集成，在群聊中实现快速、精准、带用户上下文的心理支持服务。
+构建一个轻量、可测、可一键部署的 `AI Chat + RAG + WeChat Adapter` 服务，用于替代现有 FastGPT 后端在微信群场景中的核心处理能力，并满足：
+
+1. 群聊中稳定识别发言用户、群组和是否被 @。
+2. 将微信通道与 Agent Core 解耦，避免业务逻辑被微信协议实现绑死。
+3. 默认使用内存会话与 TTL 清理，满足备案前的合规约束。
+4. 在本仓库中形成可执行 PRD、`.debug`、代码、测试的闭环。
 
 ---
 
-## 2. 产品范围
+## 2. 本期范围
 
-### 2.1 In Scope (本期)
+### 2.1 In Scope
 
-1. **Agent Core Engine** — AI Chat + RAG 核心，支持心理助手角色
-2. **LLM Gateway** — 统一大模型 API 接入层（FastGPT 转发 或 直连 API，可热切换）
-3. **Gewechat 适配器** — 兼容 Gewechat 卫星机器人协议，处理群聊消息
-4. **微信机器人模块** — 内置微信机器人客户端，支持：
-   - 群聊消息接收
-   - @提及识别与回复（@answer @提问者）
-   - 用户 ID 识别，独立对话上下文
-5. **数据管理** — 会话数据自动过期清除（合规模式），未来可切换为加密持久化
-6. **一键部署** — Docker Compose 单机部署方案
+1. `Agent Core`：统一聊天入口，拼装系统提示词、会话上下文与知识检索结果。
+2. `LLM Gateway`：支持 `FastGPT` 代理模式与 `OpenAI-compatible` 直连模式。
+3. `Knowledge Retrieval`：P0 先提供本地 Markdown 知识库加载 + 轻量检索适配层，保留后续切换向量库能力。
+4. `Gewechat Callback Adapter`：接收外部 Gewechat 服务回调，标准化为内部消息模型。
+5. `Message Router`：完成群聊/单聊识别、@ 触发判断、session_id 组装与串行处理。
+6. `Session Store`：基于内存 + TTL 的会话上下文管理。
+7. `API & Docs`：提供健康检查、聊天调试接口、Gewechat 回调接口以及对应 API 文档。
+8. `自动化测试`：覆盖消息归一化、路由、会话 TTL、API 闭环测试。
 
-### 2.2 Out of Scope (后续迭代)
+### 2.2 Out of Scope
 
-- 用户数据加密持久化（等 ICP 备案后）
-- Web 管理后台
-- 多租户 / 多 Agent 角色切换
-- 语音消息处理
-
----
-
-## 3. 架构决策记录 (ADR)
-
-### ADR-1: 技术栈选择
-
-| 维度 | 方案 A: Python FastAPI | 方案 B: Node.js (Bun) | 方案 C: Go |
-|------|----------------------|----------------------|------------|
-| 开发效率 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Agent SDK 生态 | ⭐⭐⭐⭐⭐ (OpenAI Agent SDK, LangChain) | ⭐⭐⭐⭐ | ⭐⭐ |
-| 异步并发 | ⭐⭐⭐⭐ (asyncio) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| 部署简便 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Gewechat 集成 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ (JS 原生) | ⭐⭐⭐ |
-
-**决策: Python 3.11+ / FastAPI**
-
-**理由:**
-- 主人明确倾向 Python + OpenAI Agent SDK
-- FastAPI 异步能力足够支撑社区级高并发（非百万级 C10K）
-- RAG / Agent 生态最成熟（LlamaIndex, LangChain, OpenAI Agent SDK）
-- 部署轻量，单 Docker 容器即可运行
-
-### ADR-2: LLM API 接入方案
-
-| 方案 | 延迟 | 数据管控 | 并发上限 | 成本 |
-|------|------|----------|----------|------|
-| FastGPT 转发 API | 较高 (~2-5s) | 可定期删除记录 | 受 FastGPT 限流 | 已有 |
-| 直连大模型 API | 低 (~1-2s) | 自主管控 | 仅受 API 配额 | 需申请 |
-
-**决策: 双模设计，默认 FastGPT 转发，可热切换直连**
-
-**理由:**
-- 主人倾向 FastGPT 转发 — 数据管理便利 + 已有基础设施
-- 架构上抽象出 LLM Gateway 层，后续切直连零改代码
-- FastGPT 转发的额外延迟在 Agent 层面可接受（群聊场景容忍 ~3-5s）
-
-### ADR-3: 微信机器人方案
-
-**决策: 内置集成，兼容 Gewechat 协议，同时支持独立微信机器人运行**
-
-- 优先兼容 Gewechat 协议（如果社区已部署 Gewechat）
-- 内置 `wechat-bot` 模块，可独立作为微信机器人运行
-- 两者共享相同的 Agent Core 接口，Adapter 模式解耦
+1. 真正登录微信个人号的“内置独立微信客户端”。
+2. 备案前的持久化用户会话存储。
+3. Web 管理后台。
+4. 语音消息下载、转码和发送能力。
+5. 多租户、多 Agent 角色切换。
 
 ---
 
-## 4. 系统架构
+## 3. 技术方案修正结论
 
-### 4.1 架构总览
+### ADR-1: 技术栈基线
 
+| 维度 | 决策 |
+|------|------|
+| 运行时 | Python 3.11+ |
+| Web 框架 | FastAPI |
+| 配置管理 | pydantic-settings |
+| HTTP 客户端 | httpx |
+| 测试 | pytest + pytest-asyncio |
+| 质量检查 | ruff |
+| 依赖管理 | uv |
+
+**决策理由**
+
+1. 目标仓库目前几乎为空仓，Python/FastAPI 最适合快速拉起一个可测的服务骨架。
+2. 用户既有偏好仍是 Python 生态，后续接 OpenAI SDK、FastGPT 或其他兼容网关成本低。
+3. 需要快速进入“文档 -> API -> 测试”闭环，FastAPI 在 OpenAPI、依赖注入、测试友好性上最合适。
+
+### ADR-2: 微信接入方案
+
+| 方案 | 是否 P0 | 结论 |
+|------|---------|------|
+| 内置 wechaty / itchat 客户端 | 否 | 不作为主路径 |
+| 外部 Gewechat 服务 + 本服务回调适配 | 是 | 作为 P0 主方案 |
+| 未来可插拔其他通道（企业微信/WCF 等） | 否 | 作为后续扩展点 |
+
+**修正点**
+
+结合 `dify-on-wechat` 的实现逻辑，本项目不再把“微信机器人本体”视为业务核心，而是采用：
+
+1. 外部 `Gewechat Service` 负责登录微信与消息收发。
+2. 本服务仅负责回调接收、消息标准化、路由、Agent 处理与回复生成。
+3. 微信通道通过统一消息模型接入，后续新增其他通道时不改 Agent Core。
+
+**重要风险说明**
+
+参考 `dify-on-wechat` 当前仓库说明，微信个人号链路仍存在明显外部稳定性与可用性风险。因此：
+
+1. P0 只承诺“适配 Gewechat 回调协议与内部处理闭环”。
+2. 不把“稳定登录任意个人号”写入本期验收标准。
+3. `standalone` 独立客户端能力降级为后续探索项。
+
+### ADR-3: 消息模型与路由策略
+
+借鉴 `dify-on-wechat` 的 `ChatMessage` 统一消息结构与 `session_id = actual_user_id@@group_id` 的群聊隔离规则，内部统一采用以下字段：
+
+```json
+{
+  "message_id": "msg_001",
+  "chat_type": "group",
+  "conversation_id": "wxid_user@@room_123",
+  "sender_id": "wxid_user",
+  "sender_name": "张三",
+  "room_id": "room_123",
+  "room_name": "心理互助群",
+  "mentioned": true,
+  "content": "我今天心情不好",
+  "raw_payload": {}
+}
 ```
-┌─────────────────────────────────────────────────────┐
-│                   微信群聊 / Web                      │
-└──────────────┬──────────────────────┬────────────────┘
-               │                      │
-    ┌──────────▼──────────┐  ┌───────▼───────────┐
-    │   Gewechat Adapter │  │  WeChat Bot Client │
-    │   (卫星机器人协议)   │  │  (内置微信机器人)   │
-    └──────────┬──────────┘  └───────┬───────────┘
-               │                      │
-               └──────┬───────────────┘
-                      │
-              ┌───────▼────────┐
-              │  Message Router │  ← 用户ID识别 / @解析 / 消息分发
-              └───────┬────────┘
-                      │
-              ┌───────▼────────┐
-              │  Agent Core    │  ← RAG检索 / Prompt构建 / 上下文管理
-              │  (Chat + RAG)  │
-              └───┬────────┬───┘
-                  │        │
-          ┌───────▼──┐  ┌──▼──────────┐
-          │ LLM Gate │  │ Vector Store │  ← RAG 知识库
-          │  way     │  │ (FAISS/      │
-          └───────┬──┘  │  ChromaDB)   │
-                  │      └─────────────┘
-          ┌───────▼──────────────────┐
-          │ FastGPT API / 直连 LLM API │
-          └──────────────────────────┘
+
+**路由规则**
+
+1. 单聊 `conversation_id = sender_id`
+2. 群聊默认 `conversation_id = sender_id@@room_id`
+3. 如果未来开启共享群会话，再按 `room_id` 聚合
+4. 群聊只在满足 `@机器人` 或命中关键词时触发
+5. 同一 `conversation_id` 内串行处理，避免上下文乱序
+
+### ADR-4: RAG 实现策略
+
+| 阶段 | 实现 |
+|------|------|
+| P0 | 本地 Markdown 文档加载 + 轻量关键词检索 |
+| P1 | 向量检索适配器（Chroma/FAISS） |
+
+**修正原因**
+
+当前仓库尚未具备知识库构建链路。为确保 Ralph 可以在本轮完成“实现 + 测试”，P0 先采用零外部依赖、可单测的轻量检索实现，同时保留标准检索接口，后续可以平滑替换为向量库。
+
+### ADR-5: LLM Gateway 策略
+
+| 模式 | 说明 |
+|------|------|
+| `fastgpt` | 调用 FastGPT/OpenAI-compatible 代理接口 |
+| `direct` | 直连兼容 OpenAI Chat Completions 的模型服务 |
+| `mock` | 测试模式，脱离外部网络进行本地验证 |
+
+**修正点**
+
+测试环境默认提供 `mock` gateway，确保自动化测试不依赖真实模型服务。
+
+---
+
+## 4. 参考实现借鉴点
+
+本方案直接借鉴 `dify-on-wechat` 的以下设计思想，但不会原样照搬其全部依赖：
+
+1. `channel_factory` 风格的适配器扩展位。
+2. 统一消息对象，而不是把 Gewechat 原始 payload 传入业务层。
+3. 群聊用户隔离会话规则：`actual_user_id@@group_id`。
+4. 回调接收与消息消费解耦，避免入口阻塞。
+5. 对非用户消息、状态同步消息、自发消息做显式过滤。
+
+---
+
+## 5. 系统架构
+
+### 5.1 总体架构
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                    External Gewechat Service                 │
+│         登录微信 / 接收消息 / 回调本服务 / 发送回复          │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ HTTP Callback
+┌──────────────────────────────▼───────────────────────────────┐
+│                        FastAPI App                           │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ Wechat Adapter API                                     │  │
+│  │ - POST /api/v1/wechat/gewechat/callback                │  │
+│  │ - 标准化 payload -> InboundMessage                     │  │
+│  └────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ Message Router                                         │  │
+│  │ - 触发判断                                             │  │
+│  │ - conversation_id 组装                                 │  │
+│  │ - 串行消费                                             │  │
+│  └────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ Agent Core                                             │  │
+│  │ - Session Store (TTL)                                  │  │
+│  │ - Prompt Builder                                       │  │
+│  │ - Knowledge Retriever                                  │  │
+│  │ - LLM Gateway                                          │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 目录结构
+### 5.2 目录结构
 
-```
-xinxinbao/
+```text
+xiaoxinbao-full/
+├── .debug/
+├── docs/
+│   └── api/
+├── config/
+│   └── knowledge/
+│       └── mental_health/
+├── prd/
+│   └── PRD.md
+├── scripts/
+│   └── build_knowledge.py
+├── src/
+│   └── xiaoxinbao/
+│       ├── app.py
+│       ├── settings.py
+│       ├── modules/
+│       │   ├── chat/
+│       │   ├── knowledge/
+│       │   ├── llm/
+│       │   ├── sessions/
+│       │   ├── shared/
+│       │   └── wechat/
+│       └── schemas/
+├── tests/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── pyproject.toml
-├── .env.example
-├── README.md
-│
-├── config/
-│   ├── settings.py              # 全局配置 (Pydantic Settings)
-│   ├── prompts/
-│   │   └── system_prompt.py     # 小馨宝角色 Prompt
-│   └── knowledge/               # RAG 知识库源文件
-│       └── mental_health/       # 心理健康知识文档
-│
-├── src/
-│   ├── __init__.py
-│   ├── main.py                  # FastAPI 入口
-│   │
-│   ├── gateway/                 # LLM Gateway 层
-│   │   ├── __init__.py
-│   │   ├── base.py              # 抽象接口
-│   │   ├── fastgpt.py           # FastGPT 转发适配
-│   │   └── direct_api.py        # 直连 API 适配
-│   │
-│   ├── agent/                   # Agent Core
-│   │   ├── __init__.py
-│   │   ├── core.py              # Chat + RAG 主逻辑
-│   │   ├── rag.py               # RAG 检索模块
-│   │   ├── context.py           # 用户对话上下文管理
-│   │   └── memory.py            # 会话记忆 (自动过期)
-│   │
-│   ├── adapters/                # 消息通道适配器
-│   │   ├── __init__.py
-│   │   ├── base.py              # 抽象消息适配器
-│   │   ├── Gewechat.py         # Gewechat 卫星机器人适配
-│   │   ├── wechat_bot.py        # 内置微信机器人
-│   │   └── web.py               # Web API (兼容旧前端)
-│   │
-│   ├── router/                  # 消息路由
-│   │   ├── __init__.py
-│   │   └── message_router.py    # 用户识别 / @解析 / 分发
-│   │
-│   └── data/                    # 数据管理
-│       ├── __init__.py
-│       ├── session_store.py     # 会话存储 (内存 + TTL 过期)
-│       └── cleanup.py           # 自动清理定时任务
-│
-├── tests/
-│   ├── test_agent.py
-│   ├── test_gateway.py
-│   ├── test_router.py
-│   └── test_adapters.py
-│
-└── scripts/
-    ├── build_knowledge.py       # 知识库向量化构建脚本
-    └── deploy.sh                # 一键部署脚本
+└── .env.example
 ```
 
 ---
 
-## 5. 核心功能规格
+## 6. 核心功能规格
 
-### 5.1 Agent Core (Chat + RAG)
+### 6.1 Session Store
 
-| 特性 | 规格 |
+1. 默认内存存储。
+2. TTL 默认 30 分钟。
+3. 每个 `conversation_id` 保留最近 10 轮对话。
+4. 进程重启后数据全部丢失。
+
+### 6.2 Gewechat Callback Adapter
+
+1. 仅接收文本消息作为 P0 主输入。
+2. 过滤以下消息：
+   - 状态同步消息
+   - 非用户账号消息
+   - 机器人自己发送的消息
+   - 超过 5 分钟的过期消息
+3. 解析以下字段：
+   - `sender_id`
+   - `sender_name`
+   - `room_id`
+   - `room_name`
+   - `mentioned`
+   - `content`
+
+### 6.3 Message Router
+
+1. 群聊仅在 `mentioned = true` 或命中触发关键词时进入 Agent。
+2. 群聊回复默认保留“回复给谁”的上下文信息。
+3. 路由层不直接依赖 LLM SDK 或 Gewechat SDK。
+
+### 6.4 Chat API
+
+| 接口 | 用途 |
 |------|------|
-| 角色设定 | 小馨宝心理助手 — 温暖、专业、有同理心的心理健康 AI 助手 |
-| RAG 知识库 | 心理健康 FAQ、情绪疏导话术、危机干预指南 |
-| 向量数据库 | ChromaDB (嵌入式，零运维) 或 FAISS (纯内存) |
-| 上下文窗口 | 每用户保留最近 10 轮对话，TTL 30 分钟自动过期 |
-| 响应延迟目标 | P95 < 5s (FastGPT 转发) / < 3s (直连) |
-| 并发目标 | 同时支持 20+ 群聊并发请求 |
+| `GET /health` | 健康检查 |
+| `POST /api/v1/chat/reply` | 本地调试聊天能力 |
+| `POST /api/v1/wechat/gewechat/callback` | 接收 Gewechat 消息回调 |
 
-### 5.2 LLM Gateway
+### 6.5 合规约束
 
-```python
-# 接口抽象
-class LLMGateway(Protocol):
-    async def chat(self, messages: list[dict], **kwargs) -> str: ...
-    async def stream_chat(self, messages: list[dict], **kwargs) -> AsyncIterator[str]: ...
-```
-
-- **FastGPT 模式**: 调用 FastGPT 的 `/api/v1/chat/completions` 等兼容端点
-- **直连模式**: 调用 OpenAI 兼容 API（企业捐赠的模型 key）
-- 通过 `.env` 中 `LLM_MODE=fastgpt|direct` 热切换，无需重启
-
-### 5.3 消息路由 & 用户识别
-
-```
-群聊消息流:
-  用户A在群里说: "小馨宝，我今天心情不好"
-    → 微信机器人收到消息
-    → Message Router 解析:
-        - 群ID: group_123
-        - 用户ID: user_A (微信ID)
-        - 是否@提及: 是/否
-    → Agent Core 加载 user_A 的上下文
-    → LLM 生成回复
-    → 微信机器人发送: "@用户A 小馨宝的回复内容"
-```
-
-**用户 ID 识别策略:**
-- 优先使用微信唯一 ID
-- 备选使用群内昵称 + 群ID 组合
-- 每个用户独立维护对话上下文
-
-**@回复策略:**
-- 群聊中检测到 @小馨宝 或关键词触发
-- 回复时 @提问者，确保用户看到
-- 支持配置触发关键词列表
-
-### 5.4 数据管理 & 合规
-
-| 模式 | 行为 | 适用阶段 |
-|------|------|----------|
-| **合规模式 (默认)** | 会话数据仅存内存，TTL 过期自动删除，重启即清空 | ICP 备案前 |
-| **持久化模式 (未来)** | 加密存储至 SQLite/PostgreSQL，用户授权后开启 | ICP 备案后 |
-
-合规模式下:
-- 会话上下文 TTL = 30 分钟
-- 服务重启 = 所有历史数据清空
-- 不写入任何磁盘持久化存储
-- 日志仅记录请求/响应元数据（不含用户内容）
-
-### 5.5 Gewechat 兼容
-
-- 实现 Gewechat 卫星机器人协议的消息格式
-- 通过 WebSocket 或 HTTP Webhook 接收/发送消息
-- 兼容 Gewechat 的插件注册机制
-
-### 5.6 微信机器人模块
-
-**两种运行模式:**
-
-1. **Gewechat 模式** — 作为 Gewechat 的下游服务运行，接收 Gewechat 转发的消息
-2. **独立模式** — 内置微信机器人客户端（基于 `wechaty` 或 `gewechat`），直接连接微信
-
-配置项:
-```env
-# .env
-WECHAT_MODE=Gewechat|standalone
-Gewechat_WEBHOOK_URL=...
-Gewechat_WS_URL=...
-
-# 独立模式配置
-GEWECHAT_API_URL=...
-GEWECHAT_TOKEN=...
-```
+1. 默认不将用户消息落盘。
+2. 日志仅记录元数据，不记录完整敏感会话内容。
+3. 测试示例知识库使用公开心理健康基础文本，不引入真实用户数据。
 
 ---
 
-## 6. 部署方案
-
-### 6.1 一键部署
-
-```yaml
-# docker-compose.yml
-version: "3.8"
-services:
-  xinxinbao:
-    build: .
-    ports:
-      - "8080:8080"        # API 端口
-    env_file: .env
-    restart: unless-stopped
-    volumes:
-      - ./config/knowledge:/app/config/knowledge  # 知识库文件
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-### 6.2 部署步骤
-
-```bash
-# 1. 克隆项目
-git clone <repo> && cd xinxinbao
-
-# 2. 配置环境变量
-cp .env.example .env
-# 编辑 .env，填入:
-#   LLM_MODE=fastgpt
-#   FASTGPT_API_KEY=xxx
-#   FASTGPT_API_BASE=https://xxx
-#   WECHAT_MODE=Gewechat
-#   Gewechat_WEBHOOK_URL=xxx
-
-# 3. 构建知识库（首次）
-docker compose run --rm xinxinbao python scripts/build_knowledge.py
-
-# 4. 启动服务
-docker compose up -d
-
-# 完成！
-```
-
----
-
-## 7. 非功能性需求
+## 7. 非功能性要求
 
 | 维度 | 要求 |
 |------|------|
-| 响应延迟 | P95 < 5s (含 LLM 调用) |
-| 并发能力 | ≥ 20 群同时在线 |
-| 可用性 | 99%+ (单机) |
-| 部署时间 | 从 clone 到运行 < 15 分钟 |
-| 代码量 | 核心 < 3000 行 Python |
-| 依赖数量 | 尽量少，避免依赖地狱 |
+| 响应延迟 | 本地 mock 模式 P95 < 500ms |
+| 并发能力 | 支持 20 个以上 conversation_id 的并发排队处理 |
+| 部署时间 | 从 clone 到通过测试 < 15 分钟 |
+| 可测试性 | 核心链路必须可在离线测试环境完成验证 |
 
 ---
 
-## 8. 关键技术依赖
+## 8. 关键依赖
 
-| 库 | 用途 | 版本 |
-|----|------|------|
-| FastAPI | HTTP 框架 | ^0.115 |
-| uvicorn | ASGI 服务器 | ^0.34 |
-| httpx | 异步 HTTP 客户端 (调用 LLM API) | ^0.28 |
-| chromadb | 向量数据库 (RAG) | ^1.0 |
-| pydantic | 数据模型 & 配置 | ^2.0 |
-| pydantic-settings | 环境变量管理 | ^2.0 |
-| openai | OpenAI SDK (如用 Agent SDK) | ^1.0 |
-
-可选:
-| 库 | 用途 |
-|----|------|
-| python-socketio | WebSocket (Gewechat) |
-| requests | Gewechat API 调用 |
+| 库 | 用途 | 版本建议 |
+|----|------|----------|
+| fastapi | API 框架 | ^0.115 |
+| uvicorn | ASGI 服务 | ^0.30 |
+| httpx | HTTP 客户端 | ^0.27 |
+| pydantic | 数据模型 | ^2.8 |
+| pydantic-settings | 配置管理 | ^2.4 |
+| pytest | 测试 | ^8.3 |
+| pytest-asyncio | 异步测试 | ^0.23 |
+| ruff | 代码检查 | ^0.6 |
 
 ---
 
-## 9. 开放问题 & 风险
+## 9. 风险与应对
 
-| # | 问题 | 影响 | 建议 |
+| # | 风险 | 影响 | 应对 |
 |---|------|------|------|
-| 1 | 微信机器人方案选型 (wechaty / gewechat / 其他) | 决定独立模式能否正常运行 | 调研社区现有微信机器人方案 |
-| 2 | Gewechat 协议文档是否可获取 | 影响适配器开发进度 | 确认是否能拿到 Gewechat 协议文档 |
-| 3 | FastGPT API 并发上限 | 可能成为性能瓶颈 | 压测确认，必要时切直连 |
-| 4 | 知识库内容来源 | RAG 质量决定回答质量 | 社区提供心理健康知识文档 |
-| 5 | ICP 备案时间线 | 影响持久化功能排期 | 先按合规模式设计 |
+| 1 | Gewechat 上游可用性与政策风险 | 个人号接入不稳定 | P0 只做 callback adapter，不承诺登录能力 |
+| 2 | 外部模型服务不可用 | 无法测试聊天链路 | 提供 mock gateway |
+| 3 | 轻量检索效果有限 | 心理知识召回较弱 | 预留向量检索接口 |
+| 4 | 群聊消息格式复杂 | 解析异常导致漏消息 | 先限定文本消息 + 编写规范化测试 |
 
 ---
 
-## 10. 里程碑建议
+## 10. Ralph 可执行里程碑
 
-| 阶段 | 内容 | 预估工时 |
-|------|------|----------|
-| **P0: MVP** | Agent Core + LLM Gateway + Web API + 基础 RAG | 2-3 天 |
-| **P1: 群聊接入** | Gewechat 适配器 + 消息路由 + 用户识别 | 1-2 天 |
-| **P2: 微信机器人** | 内置微信机器人 + @回复 + 群聊上下文 | 2-3 天 |
-| **P3: 部署上线** | Docker 化 + 一键部署 + 压测 | 1 天 |
-
-**总预估: 6-9 天** (AI 辅助编码)
-
----
-
-## 11. 给 AI 编程工具的执行指令
-
-> 见附件 `AGENT_INSTRUCTIONS.md`（可在确认 PRD 后生成）
+| 阶段 | 内容 | 验收 |
+|------|------|------|
+| P0-1 | 项目骨架、配置、健康检查、质量工具 | `ruff` 与 `pytest` 可运行 |
+| P0-2 | Session Store、Knowledge Retriever、LLM Gateway | 单元测试通过 |
+| P0-3 | Chat API 与 Agent Core | 调试接口可返回结果 |
+| P0-4 | Gewechat Callback Adapter 与 Message Router | 回调测试通过，群聊 session 规则正确 |
+| P0-5 | Docker/README/API 文档闭环 | 本地启动说明完整 |
 
 ---
 
-*小虾出品 · 2026-04-06 · 🦞*
+## 11. Ralph Story 拆分原则
+
+1. 每个 Story 必须在单轮内完成。
+2. 优先顺序固定为：骨架 -> 核心模块 -> API -> 通道适配 -> 文档与部署。
+3. 每个 Story 必须包含 `Typecheck/Quality checks pass`。
+4. 与 Gewechat 真实登录相关的工作不得作为本轮硬性验收项。
+
+---
+
+## 12. 当前结论
+
+本 PRD 已从“内置微信机器人一体化实现”修正为“外部 Gewechat 服务 + 内部标准化适配 + Agent Core 解耦”的可执行方案。后续 Ralph 落地应严格围绕该修正版继续推进。

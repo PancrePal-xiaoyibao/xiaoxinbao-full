@@ -1,0 +1,19 @@
+# Ralph Progress Log
+Started: 2026-04-06
+---
+
+## Codebase Patterns
+- Keep Gewechat raw payload parsing inside the wechat adapter module; downstream code only consumes normalized messages.
+- Group conversations default to `actual_user_id@@group_id` so one user does not pollute another user's context in the same room.
+- Local verification must run against the mock LLM gateway; tests must not depend on real model credentials or a live WeChat service.
+- P0 does not persist user conversation content to disk; only non-sensitive metadata may appear in logs or docs.
+
+## 2026-04-06 08:45 - US-000
+Thread: local://manual-initialization
+- Revised `prd/PRD.md` to align with adapter-first WeChat integration and realistic Gewechat constraints.
+- Created `.debug` workspace with ADR notes, execution constraints, and TODO tracking.
+- Generated initial `prd.json` and `prd-progress.txt` as Ralph execution memory.
+- Learnings for future iterations:
+  - The existing Ralph prompt referenced `progress.txt`; the active progress file in this repo is `prd-progress.txt`.
+  - The current environment lacks `amp` and `jq`, so Ralph iterations must be executed through an equivalent local loop until tooling is restored.
+---

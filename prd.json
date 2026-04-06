@@ -1,0 +1,94 @@
+{
+  "project": "xiaoxinbao-full",
+  "branchName": "ralph/xiaoxinbao-gewechat-p0",
+  "description": "Build a testable FastAPI-based AI chat and Gewechat callback adapter service for XiaoXinBao using an adapter-first architecture.",
+  "userStories": [
+    {
+      "id": "US-000",
+      "title": "Sync PRD and debug baseline",
+      "description": "As the project maintainer, I want the PRD and .debug workspace aligned so that Ralph can execute against a realistic and testable technical plan.",
+      "acceptanceCriteria": [
+        "PRD reflects external Gewechat callback adapter as the P0 path",
+        ".debug contains architecture notes and TODOs",
+        "Typecheck passes"
+      ],
+      "priority": 0,
+      "passes": true,
+      "notes": "Completed manually before Ralph code iteration. No code changes required."
+    },
+    {
+      "id": "US-001",
+      "title": "Bootstrap backend project and quality toolchain",
+      "description": "As a developer, I want a Python/FastAPI project skeleton with uv, ruff, mypy, and pytest so that later stories can be implemented safely.",
+      "acceptanceCriteria": [
+        "Project skeleton exists under src/xiaoxinbao with application entrypoint",
+        "ruff and mypy configuration exists",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Implement session, retrieval, and LLM gateway modules",
+      "description": "As an agent runtime, I want session TTL storage, lightweight knowledge retrieval, and pluggable LLM gateways so that chat orchestration has stable building blocks.",
+      "acceptanceCriteria": [
+        "Session store enforces TTL and history window",
+        "Knowledge retriever can load local markdown knowledge",
+        "fastgpt, direct, and mock gateways share one interface",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Expose chat API and agent orchestration",
+      "description": "As an operator, I want a chat debug API that runs the agent core so that the system can be verified without a live WeChat dependency.",
+      "acceptanceCriteria": [
+        "POST /api/v1/chat/reply returns an agent response",
+        "Agent core composes prompt, retrieval, and session state",
+        "OpenAPI-visible request and response schemas exist",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Implement Gewechat callback adapter and router rules",
+      "description": "As a WeChat bridge, I want Gewechat callbacks normalized into internal messages and routed with group mention rules so that group chat handling matches the revised PRD.",
+      "acceptanceCriteria": [
+        "POST /api/v1/wechat/gewechat/callback accepts supported text payloads",
+        "Non-user, expired, and self messages are ignored",
+        "Group conversation ids follow actual_user_id@@group_id",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Close documentation, deployment, and test loop",
+      "description": "As the maintainer, I want API docs, README, Docker assets, and progress records updated so that PRD, .debug, and implementation remain in sync.",
+      "acceptanceCriteria": [
+        "README and docs/api describe the implemented APIs",
+        "Dockerfile, docker-compose, and .env.example support local startup",
+        "prd-progress.txt and .debug reflect the completed work",
+        "Typecheck passes",
+        "Pytest passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
