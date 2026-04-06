@@ -27,8 +27,8 @@
         "Pytest passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed with pyproject, FastAPI app bootstrap, .gitignore, uv lockfile, ruff, mypy, and pytest baseline."
     },
     {
       "id": "US-002",
@@ -42,8 +42,8 @@
         "Pytest passes"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed with SessionStore TTL handling, markdown knowledge retriever, and mock/fastgpt/direct gateway factory."
     },
     {
       "id": "US-003",
@@ -57,8 +57,8 @@
         "Pytest passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed with AgentService orchestration and POST /api/v1/chat/reply API."
     },
     {
       "id": "US-004",
@@ -72,8 +72,8 @@
         "Pytest passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed with Gewechat payload normalizer, group trigger routing, and callback API tests."
     },
     {
       "id": "US-005",
@@ -87,8 +87,8 @@
         "Pytest passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Completed with README, docs/api, Docker assets, knowledge build script, and final verification."
     }
   ]
 }
